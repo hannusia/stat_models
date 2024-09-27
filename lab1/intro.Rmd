@@ -1,0 +1,118 @@
+---
+title: "Lab №1: Intro"
+output:
+  html_notebook: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r}
+group <- 3
+variant <- group * 25 + 4
+set.seed(variant)
+redundant <- round(runif(1, 5 + group, 25 - group))
+```
+
+```{r}
+college <- read.csv("College.csv", stringsAsFactors = TRUE)
+```
+
+```{r}
+college_new <- college[-sample(1:length(college[,1]), round((redundant/100) * length(college[,1]))),]
+```
+
+```{r}
+fix(college_new)
+```
+
+```{r}
+rownames <- college_new[,1]
+college_new <- college_new[,-1]
+fix(college_new)
+```
+
+```{r}
+summary(college_new)
+```
+
+```{r}
+pairs(~ Accept + Enroll + Top10perc, data = college_new)
+```
+```{r}
+plot(college_new$Outstate, college_new$Private)
+plot(college_new$Private, college_new$Outstate)
+```
+```{r}
+Elite <-  rep("No", nrow(college_new))
+Elite[college_new$Top10perc > 50] <-  "Yes"
+Elite <-  as.factor(Elite)
+college_new <-  data.frame(college_new, Elite)
+```
+
+```{r}
+plot(college_new$Elite, college_new$Outstate)
+```
+
+```{r}
+row.names(college_new[college_new$Elite == "Yes",])
+```
+
+```{r}
+nrow(college_new[college_new$Elite == "Yes",])
+```
+
+
+```{r}
+library(MASS)
+?Boston
+```
+
+```{r}
+dim(Boston)
+```
+
+```{r}
+boston_new <- Boston[-sample(1:length(Boston[,1]), round((redundant/100) * length(Boston[,1]))),]
+```
+
+```{r}
+dim(boston_new[boston_new$chas==1,])[1]
+```
+
+```{r}
+median(boston_new$ptratio)
+```
+
+```{r}
+row.names(boston_new[boston_new$medv == min(boston_new$medv),])
+```
+
+```{r}
+row.names(boston_new[boston_new$medv == max(boston_new$medv),])
+```
+
+```{r}
+row.names(boston_new[boston_new$rm > 7,])
+```
+
+```{r}
+row.names(boston_new[boston_new$rm > 8,])
+```
+
+```{r}
+row.names(boston_new[boston_new$rm > 4 & boston_new$rm < 7,])
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
