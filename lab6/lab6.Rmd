@@ -1,0 +1,235 @@
+---
+title: 'Ind 6: Нелінійні моделі'
+subtitle: "Виконала: Єршова Ганна, студентка групи ПМіМ-13"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+Встановлюємо значення variant, seed та redundant
+
+```{r}
+library(boot)
+library(ggplot2)
+library(splines)
+
+group <- 3
+variant <- group * 25 + 4
+set.seed(variant)
+redundant <- round(runif(1, 5 + group, 25 - group))
+options(warn=-1)
+```
+
+## Завдання №1
+
+Завантажуємо дані Auto
+
+```{r}
+auto <- read.csv("Auto.csv", stringsAsFactors = TRUE)
+auto_new <- auto[-sample(1:length(auto[,1]), round((redundant/100) * length(auto[,1]))),]
+auto_new$horsepower[auto_new$horsepower == "?"] <- NA
+auto_new$horsepower <- as.numeric(auto_new$horsepower)
+auto_new <- na.omit(auto_new)
+```
+
+Кубічна поліноміальна регресія для передбачення mpg за допомогою horsepower
+
+```{r}
+model_poly3 <- lm(mpg ~ poly(horsepower, 3), data = auto_new)
+summary(model_poly3)
+```
+
+Модель загалом є статистично значущою і пояснює частину варіації в значеннях mpg. Перший і третій компоненти кубічного поліному мають значний вплив на передбачення, тоді як другий компонент менш значимий.
+
+```{r}
+ggplot(auto_new, aes(x = horsepower, y = mpg)) +
+  geom_point(color = "green", alpha = 0.6) +
+  stat_smooth(method = "lm", formula = y ~ poly(x, 3)) +
+  labs(title = "Кубічна поліноміальна регресія для mpg ~ horsepower",
+       x = "Horsepower",
+       y = "mpg")
+```
+
+Будуємо поліноміальні регресії для різних степенів та обчислюємо RSS
+
+```{r}
+rss_values <- c()
+degree_range <- 1:15
+
+for (d in degree_range) {
+  model <- lm(mpg ~ poly(horsepower, d), data = auto_new)
+  rss <- sum(residuals(model)^2)
+  rss_values <- c(rss_values, rss)
+}
+
+rss_values
+```
+
+```{r}
+plot(degree_range, rss_values, type = "b", xlab = "Степінь", ylab = "RSS")
+```
+
+На основі перехресної перевірки обираємо «оптимальний» степінь для поліноміальної регресії
+
+```{r}
+cv_errors_pl <- c()
+
+for (d in degree_range) {
+  model <- glm(mpg ~ poly(horsepower, d), data = auto_new)
+  cv_error <- cv.glm(auto_new, model, K = 10)$delta[1]
+  cv_errors_pl <- c(cv_errors_pl, cv_error)
+}
+
+optimal_degree <- degree_range[which.min(cv_errors_pl)]
+cat("Оптимальний степінь поліноміальної регресії:", optimal_degree, "\n")
+
+```
+
+Сплайн регресія
+```{r}
+spline_model <- lm(mpg ~ bs(horsepower, df=3), data = auto_new)
+summary(spline_model)
+```
+
+```{r}
+ggplot(auto_new, aes(x = horsepower, y = mpg)) +
+  geom_point() +
+  stat_smooth(method = "lm", formula = y ~ bs(x, df=3), color = "red") +
+  theme_minimal()
+```
+
+RSS для різних ступенів свободи
+
+```{r message=FALSE, warning=FALSE}
+rss_spline_values <- numeric(15)
+df_range <- 1:15
+for (df in df_range) {
+  spline_model <- glm(mpg ~ bs(horsepower, df = df), data = auto_new)
+  rss_spline_values[df] <- sum(residuals(spline_model)^2)
+}
+
+rss_spline_values
+```
+
+```{r}
+plot(df_range, rss_spline_values, type = "b", xlab = "Ступені свободи", ylab = "RSS")
+```
+
+Обираємо оптимальний ступінь свободи
+
+```{r message=FALSE, warning=FALSE}
+df_range <- 3:15
+cv_errors <- c()
+
+for (df in df_range) {
+    spline_model <- glm(mpg ~ bs(horsepower, df = df), data = auto_new)
+    cv_error <- cv.glm(auto_new, spline_model, K = 10)$delta[1]
+    cv_errors <- c(cv_errors, cv_error)
+}
+
+optimal_df <- df_range[which.min(cv_errors)]
+cat("Оптимальний ступінь свободи поліноміальної регресії:", optimal_df, "\n")
+```
+
+Порівнюємо найкращу поліноміальну регресію та найкращу сплайн регресію
+
+```{r}
+cat("Похобка поліноміальної регресії:", min(cv_errors_pl), "\n")
+cat("Похобка сплайн регресії:", min(cv_errors), "\n")
+```
+
+## Завдання №2
+
+Генеруємо дані
+
+```{r}
+X1 <- rt(100, df = variant / 15)
+X2 <- rt(100, df = variant / 15)
+epsilon <- rnorm(100)
+beta1 <- rchisq(1, df = variant / redundant)
+Y <- variant * X1 + 2 * (variant + 1) * X2 + epsilon
+```
+
+Оцінюємо модель $Y-\beta_1X1=\beta_2X2+\epsilon$
+
+```{r}
+Y_new <- Y - beta1 * X1
+lr <- lm(Y_new ~ X2)
+summary(lr)
+```
+
+```{r}
+beta2 = lr$coef[2]
+beta2
+```
+
+Оцінюємо модель $Y-\beta_2X2=\beta_1X1+\epsilon$
+
+```{r}
+Y_new <- Y - beta2 * X2
+lr2 <- lm(Y_new ~ X2)
+summary(lr2)
+```
+
+```{r}
+beta1 = lr2$coef[2]
+beta1
+```
+
+Повторюємо попередні кроки 100 разів
+
+```{r}
+library(tibble)
+coef <- tibble(
+  Iteration = 1:100,
+  B1 = rep(NA, 100),
+  B2 = rep(NA, 100)
+)
+
+B1 <- rchisq(1, df = variant / redundant)
+for (i in 1:100) {
+  Y_new <- Y - B1 * X1
+  temp_model <- lm(Y_new ~ X2)
+  coef[i, "B2"] <- temp_model$coef[2]
+  B2 <- temp_model$coef[2]
+  
+  Y_new <- Y - B2 * X2
+  temp_model <- lm(Y_new ~ X1)
+  coef[i, "B1"] <- temp_model$coef[2]
+  B1 <- temp_model$coef[2]
+}
+```
+
+```{r}
+library(tidyr)
+
+coef_long <- coef %>%
+  pivot_longer(cols = c(B1, B2), names_to = "Coefficient", values_to = "Value")
+
+ggplot(coef_long, aes(x = Iteration, y = Value, color = Coefficient)) +
+  geom_line() +
+  labs(x = "Ітерація",
+       y = "Значення коефіцієнта") +
+  theme_minimal() +
+  scale_color_manual(values = c("B1" = "green", "B2" = "pink"))
+```
+
+Будуємо регресію Y на X1 та X2
+
+```{r}
+glm_xy <- glm(Y ~ X1 + X2)
+summary(glm_xy)
+```
+
+Порівнюємо значення отримані методом підгонки параметрів моделі з результатами оцінки множинної регресії
+
+```{r}
+print(B1)
+print(glm_xy$coef[2])
+```
+
+```{r}
+print(B2)
+print(glm_xy$coef[3])
+```

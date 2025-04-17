@@ -1,0 +1,145 @@
+---
+title: "Lab №2: Linear  regression"
+output:
+  html_notebook: default
+  pdf_document: default
+  word_document: default
+---
+
+---
+## Task №1
+---
+```{r}
+group <- 3
+variant <- group * 25 + 4
+set.seed(variant)
+redundant <- round(runif(1, 5 + group, 25 - group))
+```
+
+```{r}
+auto <- read.csv("Auto.csv", stringsAsFactors = TRUE)
+```
+
+```{r}
+auto_new <- auto[-sample(1:length(auto[,1]), round((redundant/100) * length(auto[,1]))),]
+```
+
+```{r}
+fix(auto_new)
+```
+
+```{r}
+auto_lm <- lm(mpg~weight, data=auto_new)
+```
+
+```{r}
+summary(auto_lm)
+```
+
+```{r}
+plot(auto_new$weight, auto_new$mpg)
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(auto_lm)
+```
+
+---
+subtitle: Task №2
+---
+```{r}
+library(ISLR)
+carseats_new <- Carseats[-sample(1:length(Carseats[,1]), round((redundant/100) * length(Carseats[,1]))),]
+```
+
+```{r}
+fix(carseats_new)
+```
+
+
+```{r}
+carseats_lm <- lm(Sales~Price+Urban+US, data=carseats_new)
+```
+
+```{r}
+summary(carseats_lm)
+```
+
+```{r}
+carseats_lm2 <- lm(Sales~Price+US, data=carseats_new)
+```
+
+```{r}
+summary(carseats_lm2)
+```
+
+```{r}
+plot(carseats_lm2)
+```
+
+---
+subtitle: Task №3
+---
+```{r}
+set.seed(variant)
+x1 <- runif(100)
+x2 <- (variant / 2) * x1 + rnorm(100) * variant / 10
+y <- (2 * variant) + variant * x1 + (variant / 3) * x2 + rnorm(100)
+```
+
+```{r}
+plot(x1, x2)
+```
+
+```{r}
+cor(x1, x2)
+```
+
+```{r}
+lr <- lm(y~x1+x2)
+```
+
+```{r}
+summary(lr)
+```
+
+```{r}
+lm_x1 <- lm(y~x1)
+summary(lm_x1)
+```
+
+```{r}
+lm_x2 <- lm(y~x2)
+summary(lm_x2)
+```
+
+```{r}
+x1 <- c(x1, 0.1)
+x2 <- c(x2, (variant / 2) * 0.9)
+y <- c(y, 5 * variant)
+```
+
+```{r}
+lr_new <- lm(y~x1+x2)
+summary(lr_new)
+```
+
+```{r}
+lm_x1_new <- lm(y~x1)
+summary(lm_x1_new)
+```
+
+```{r}
+lm_x2_new <- lm(y~x2)
+summary(lm_x2_new)
+```
+
+```{r}
+plot(hatvalues(lr_new))
+```
+
+```{r}
+plot(lr_new)
+```
+

@@ -1,0 +1,178 @@
+---
+title: 'Ind 4: Методи ресемплінгу'
+subtitle: "Виконала: Єршова Ганна, студентка групи ПМіМ-13"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+Встановлюємо значення variant, seed та redundant
+```{r}
+library(boot)
+group <- 3
+variant <- group * 25 + 4
+set.seed(variant)
+redundant <- round(runif(1, 5 + group, 25 - group))
+```
+
+## Завдання №1
+Завантажуємо дані та видаляємо redundant % значень
+```{r}
+library(MASS)
+boston_new <- Boston[-sample(1:length(Boston[,1]), round((redundant/100) * length(Boston[,1]))),]
+```
+
+```{r}
+?Boston
+```
+
+Додамо змінну, яка позначатиме, чи рівень злочинності перевищує середній 
+```{r}
+crime_mean <- mean(boston_new$crim)
+boston_new$crime_level <- ifelse(boston_new$crim > crime_mean, 1, 0)
+```
+
+Будуємо модель логістичної регресії для передбачення рівня
+злочинності більшого чи меншого за середній на основі змінних nox та rad
+```{r}
+train <- sample(nrow(boston_new), nrow(boston_new)/2)
+lr.train.fit <- glm(crime_level ~ nox + rad, data=boston_new, family=binomial, subset=train)
+summary(lr.train.fit)
+```
+
+```{r}
+lr.prob <- predict(lr.train.fit, boston_new)
+lr.prob.val <- lr.prob[-train]
+lr.pred <- rep(0, length(lr.prob.val))
+lr.pred[lr.prob.val > 0.5] <- 1
+```
+
+Тестова помилка
+```{r}
+mean((boston_new$crime_level[-train] != lr.pred))
+```
+
+Повторимо попередню процедуру три рази
+```{r}
+train.model <- function(seed) {
+  set.seed(seed)
+  t.split <- sample(nrow(boston_new), nrow(boston_new) * 0.5)
+  lr <- glm(crime_level ~ nox + rad, data = boston_new, family = binomial, subset = t.split)
+  lr.p <- predict(lr, boston_new[-t.split, ], type = "response")
+  pred <- ifelse(lr.p > 0.5, 1, 0)
+  test_error <- mean(boston_new$crime_level[-t.split] != pred)
+  return(test_error)
+}
+```
+
+```{r}
+set.seed(variant)
+seeds <- sample(1:1000, 3)
+test_errors <- sapply(seeds, train.model)
+```
+
+```{r}
+print(test_errors)
+average_test_error <- mean(test_errors)
+cat("Average test error over three runs:", average_test_error, "\n")
+```
+
+Додаємо змінну medv
+```{r}
+train.model.medv <- function(seed) {
+  set.seed(seed)
+  t.split <- sample(nrow(boston_new), nrow(boston_new) * 0.5)
+  lr <- glm(crime_level ~ nox + rad + medv, data = boston_new, family = binomial, subset = t.split)
+  lr.p <- predict(lr, boston_new[-t.split, ], type = "response")
+  pred <- ifelse(lr.p > 0.5, 1, 0)
+  test_error <- mean(boston_new$crime_level[-t.split] != pred)
+  return(test_error)
+}
+```
+
+```{r}
+test_errors <- sapply(seeds, train.model.medv)
+print(test_errors)
+average_test_error <- mean(test_errors)
+cat("Average test error over three runs:", average_test_error, "\n")
+```
+
+## Завдання №2
+Завантажуємо дані
+```{r}
+auto <- read.csv("Auto.csv", stringsAsFactors = TRUE)
+auto_new <- auto[-sample(1:length(auto[,1]), round((redundant/100) * length(auto[,1]))),]
+```
+
+Оцінка середнього значення та стандартної похибки для змінної mpg
+```{r}
+mpg_mean <- mean(auto_new$mpg)
+mpg_se <- sd(auto_new$mpg) / sqrt(length(auto_new$mpg))
+
+cat("Середнє mpg:", mpg_mean, "\n")
+cat("Стандартна похибка:", mpg_se, "\n")
+```
+
+Оцінюємо стандартну похибку за допомогою бутстрапу
+```{r}
+boot_mean <- function(data, indices) mean(data[indices])
+mpg_sd_boot <- boot(data = auto_new$mpg, statistic = boot_mean, R = 1000)
+cat("Бутстрап-оцінка стандартної похибки:", sd(mpg_sd_boot$t), "\n")
+```
+
+Оцінюємо стандартну похибку медіани
+```{r}
+boot_median <- function(data, index) median(data[index])
+
+mpg_median_boot <- boot(data = auto_new$mpg, statistic = boot_median, R = 1000)
+mpg_median <- median(auto_new$mpg)
+cat("Медіана mpg:", mpg_median, "\n")
+cat("Бутстрап-оцінка стандартної похибки медіани:", sd(mpg_median_boot$t), "\n")
+```
+
+Оцінюємо стандартну похибку десятого процентиля
+```{r}
+boot_10 <- function(data, index) quantile(data[index], 0.1)
+
+mpg_10_boot <- boot(data = auto_new$mpg, statistic = boot_10, R = 1000)
+mpg_10 <- quantile(auto_new$mpg, 0.1)
+cat("Десятий процентиль mpg:", mpg_10, "\n")
+cat("Бутстрап-оцінка стандартної похибки десятого процентиля:", sd(mpg_10_boot$t), "\n")
+```
+
+
+## Завдання №3
+Генеруємо дані
+```{r}
+set.seed(variant)
+x = rnorm (100)
+y = variant*x - ((redundant*40)/variant) * x ^ 2 + rnorm (100)
+```
+
+```{r}
+loocv.fn = function(df, exponent) {
+  glm.fit = glm(y~poly(x, exponent), df)
+}
+```
+
+```{r}
+set.seed(variant)
+df <- data.frame(x,y)
+cv.error <- rep(0, 4)
+
+for (i in 1:4) {
+  glm.fit <- glm(y~poly(x, i))
+  cv.error[i] <- cv.glm(df, glm.fit)$delta[1]
+}
+```
+
+```{r}
+cv.error
+```
+
+```{r}
+plot(1:4, cv.error)
+```
+Найменша помилка у квадратичної моделі. Це відповідає очікуванням, оскільки у даних
+квадратична залежність.

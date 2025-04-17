@@ -1,0 +1,129 @@
+---
+title: 'Ind 5: Вибір лінійної моделі та регуляризація'
+subtitle: "Виконала: Єршова Ганна, студентка групи ПМіМ-13"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+Встановлюємо значення variant, seed та redundant
+```{r}
+group <- 3
+variant <- group * 25 + 4
+set.seed(variant)
+redundant <- round(runif(1, 5 + group, 25 - group))
+```
+
+## Завдання №1
+Завантажуємо дані
+```{r}
+auto = read.csv("Auto.csv", stringsAsFactors = TRUE)
+auto_new = auto[-sample(1:length(auto[,1]), round((redundant/100) * length(auto[,1]))),]
+auto_new[sapply(auto_new, is.infinite)] <- NA 
+auto_new <- na.omit(auto_new)
+```
+
+Ділимо дані на тренувальну та тестову вибірку
+```{r}
+training = sample(1:nrow(auto_new), nrow(auto_new) * (1 - redundant / 50), replace = F)
+train = auto_new[training,]
+test = auto_new[-training,]
+train$horsepower = droplevels(train$horsepower)
+test$horsepower = factor(test$horsepower, levels = levels(train$horsepower))
+train$name <- droplevels(train$name)
+test$name <- factor(test$name, levels = levels(train$name))
+```
+
+Лінійна модель на основі методу найменших квадратів
+```{r}
+library(magrittr)
+linear_model <- lm(mpg ~ ., data = train)
+linear_pred <- predict(linear_model, new_data = X_test) %>% `names<-`(".pred")
+mse_linear <- mean((y_test - linear_pred) ^ 2)
+```
+
+```{r}
+mse_linear
+```
+
+Модель гребеневої регресії
+```{r}
+library(glmnet)
+x <- model.matrix(mpg ~ . , data = College )[,-1]
+y <- auto_new$mpg
+
+grid = 10 ^ seq(4, -2, length=100)
+ridge_model <- glmnet(x[training,], y[training], alpha = 0, lambda = grid, thresh = 1e-12)
+
+cv.out <- cv.glmnet(x[training,], y[training], alpha=0)
+plot(cv.out)
+best_lambda <- cv.out$lambda.min
+print(best_lambda)
+
+ridge_pred <- predict(ridge_model, s=best_lambda, newx = x[-training,])
+mse_ridge <- mean((ridge.pred - test$mpg)^2)
+```
+Модель ласо
+```{r}
+lasso_model <- glmnet(x[training,], y[training], alpha = 1, lambda = grid, thresh = 1e-12)
+lasso_out <- cv.glmnet(x[training,], y[training], alpha=1)
+best_lambda <- lasso_out$lambda.min
+lasso_pred <- predict(lasso.model, s=best_lambda, newx = x[-training,])
+lasso.model <- glmnet(x[training,], y[training], alpha = 1, lambda = best_lambda)
+predict(lasso.model, s=best_lambda, type="coefficients")
+mse_lasso <- mean((lasso.pred - test$mpg)^2)
+```
+
+PCR модель
+```{r}
+library(pls)
+pcr.fit <- pcr(mpg ~ ., data = train, scale = TRUE, validation = "CV")
+summary(pcr.fit)
+```
+
+
+PLS модель
+```{r}
+
+```
+
+
+## Завдання №2
+
+Генеруємо предиктор X та вектор залишків
+```{r}
+n = 100 * (1 + variant %/% 10)
+mu = variant/5 + 1
+sigma = (2*variant)^(1/2) + 1
+X = rnorm(n, mu, sigma)
+epsilon = rnorm(100)
+```
+
+Генеруємо Y
+```{r}
+beta0 = round(runif(1, min = -10, max = 10))
+beta1 = round(runif(1, min = -10, max = 10))
+beta2 = round(runif(1, min = -10, max = 10))
+beta3 = round(runif(1, min = -10, max = 10))
+
+Y = beta0 + beta1 * X + beta2 * X^2 + beta3 * X^3 + epsilon
+```
+
+```{r}
+library(leaps)
+regfit.full=regsubsets(Y~., poly(X, 10))
+reg.summary=summary(regfit.full)
+
+names(reg.summary)
+reg.summary$rsq
+reg.summary$bic
+reg.summary$cp
+reg.summary$adjr2
+
+par(mfrow=c(2,2))
+plot(reg.summary$rsq)
+plot(reg.summary$bic)
+plot(reg.summary$cp)
+plot(reg.summary$adjr2)
+```

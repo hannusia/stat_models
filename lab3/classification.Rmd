@@ -1,0 +1,216 @@
+---
+title: "Lab №3: Classification"
+output:
+  html_notebook: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r}
+group <- 3
+variant <- group * 25 + 4
+set.seed(variant)
+redundant <- round(runif(1, 5 + group, 25 - group))
+year <- round(runif(1, 2006, 2008))
+```
+
+```{r}
+library(ISLR)
+library(MASS)
+names(Weekly)
+```
+
+```{r}
+train <- Weekly[Weekly$Year <= year, ]
+test <- Weekly[Weekly$Year > year, ]
+test_direction <- test$Direction
+```
+
+```{r}
+glm_fit <- glm(Direction ~ Lag2, data=train, family=binomial)
+```
+
+```{r}
+glm_pred <- predict(glm_fit, test, type="response")
+```
+
+```{r}
+lr_pred
+```
+
+```{r}
+predictions <- rep("Down", nrow(test))
+predictions[glm_pred > 0.5] <-  "Up"
+predictions
+```
+
+```{r}
+table(predictions, test_direction)
+```
+
+```{r}
+mean(predictions == test_direction)
+```
+
+
+```{r}
+lda_fit <- lda(Direction ~ Lag2, data=train)
+lda_pred <- predict(lda_fit, test, type="response")
+lda_class <- lda_pred$class
+table(lda_class, test_direction)
+```
+
+```{r}
+mean(lda_class == test_direction)
+```
+
+```{r}
+qda_fit <- qda(Direction ~ Lag2, data=train)
+qda_pred <- predict(qda_fit, test)
+qda_class <- qda_pred$class
+table(qda_class, test_direction)
+```
+
+```{r}
+mean(qda_class == test_direction)
+```
+
+```{r}
+library(class)
+```
+
+```{r}
+train_X <- as.matrix(train$Lag2)
+train_y <- as.matrix(train$Direction)
+test_X <- as.matrix(test$Lag2)
+```
+
+```{r}
+knn_pred <- knn(train_X, test_X, train_y, k=1)
+```
+
+```{r}
+table(knn_pred, test_direction)
+```
+
+```{r}
+mean(knn_pred == test_direction)
+```
+
+```{r}
+K_values <- seq(1, nrow(test_X) - 1, by = 2)
+accuracy_results <- numeric(length(K_values))
+max_acc <- 0
+```
+
+```{r}
+for (i in 1:length(K_values)) {
+  K <- K_values[i]
+  
+  knn_pred <- knn(train_X, test_X, train_y, k = K)
+  
+  accuracy <- mean(knn_pred == test_direction)
+  
+  if (accuracy > max_acc) {
+    max_acc <- accuracy
+    k <- K
+  }
+  
+  accuracy_results[i] <- accuracy
+}
+```
+
+```{r}
+cat("Max Accuracy:", max_acc, "for k =", k, "\n")
+```
+
+```{r}
+auto_new <- Auto[-sample(1:length(Auto[,1]), round((redundant/100) * length(Auto[,1]))),]
+```
+
+```{r}
+mpg01 <- rep(0, nrow(auto_new))
+mpg01[auto_new$mpg >= mean(auto_new$mpg)] <- 1
+auto_new$mpg01 <- mpg01
+```
+
+```{r}
+train_idx <- sample(seq_len(nrow(auto_new)), size=round(nrow(auto_new) * 2 * redundant / 100))
+train <- auto_new[train_idx,]
+test <- auto_new[-train_idx, ]
+y_train <- train$mpg01
+y_test <- test$mpg01
+```
+
+```{r}
+lda_fit <- lda(mpg01 ~ displacement + horsepower + weight, data=train)
+lda_pred <- predict(lda_fit, test)
+table(lda_pred$class, y_test)
+```
+```{r}
+mean(lda_pred$class != y_test)
+```
+
+```{r}
+qda_fit <- qda(mpg01 ~ displacement + horsepower + weight, data=train)
+qda_pred <- predict(qda_fit, test)
+```
+
+```{r}
+table(qda_pred$class, y_test)
+```
+
+```{r}
+mean(qda_pred$class != y_test)
+```
+
+```{r}
+lr_fit <- glm(mpg01 ~ displacement + horsepower + weight, 
+             data=train,
+             family=binomial)
+lr_fit_probs <- predict(lr_fit, test, type="response")
+lr_fit_pred <- rep(0, nrow(test))
+lr_fit_pred[lr_fit_probs > 0.5] <- 1
+```
+
+```{r}
+table(lr_fit_pred, y_test)
+```
+
+```{r}
+mean(lr_fit_pred != y_test)
+```
+
+```{r}
+train_X <- scale(cbind(train$displacement + train$horsepower + train$weight))
+train_y <- train$mpg01
+test_X = scale(cbind(test$displacement + test$horsepower + test$weight))
+
+knn_pred = knn(train_X, test_X, train_y, k=1)
+```
+
+```{r}
+mean(y_test != knn_pred)
+```
+
+```{r}
+K_values <- seq(1, nrow(train_X) - 1, by = 2)
+errors <- numeric(length(K_values))
+min_err <- 1
+
+for (i in 1:length(K_values)) {
+  K <- K_values[i]
+  knn_pred <- knn(train_X, test_X, train_y, k = K)
+  err <- mean(knn_pred != y_test)
+  if (err < min_err) {
+    min_err <- err
+    k <- K
+  }
+  errors[i] <- err
+}
+```
+
+```{r}
+cat("Min Error:", min_err, "for k =", k, "\n")
+```
+
